@@ -16,3 +16,8 @@ SOURCES += main.cpp\
 
 HEADERS  += updater.h \
     logger.h
+
+RESOURCES += \
+    icons.qrc
+
+RC_FILE = icon.rc

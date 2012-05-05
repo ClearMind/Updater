@@ -14,7 +14,8 @@ Updater::Updater(const QString &pn, const QString &p, const QString &u, QWidget 
     netReply = 0;
     proc = new QProcess(this);
     netManager = new QNetworkAccessManager(this);
-    netRequest.setUrl(url + "/update.xml");
+    netRequest.setUrl(url);
+    url.remove(url.lastIndexOf("/"), url.size());
 
     reader = new QXmlStreamReader();
 
@@ -35,6 +36,8 @@ Updater::Updater(const QString &pn, const QString &p, const QString &u, QWidget 
     lay->addWidget(progressBar);
 
     setLayout(lay);
+
+    setWindowIcon(QIcon(":/icon.png"));
 
     // create directories ++++++++++++++++++++++++++++++++++++++++++++++++++
     QDir dir(QDir::homePath() + "/.updater/" + programName);
@@ -189,7 +192,6 @@ void Updater::down() {
         }
     }
     QFile out(path + filename);
-    qDebug() << exe << " " << filename.right(filename.size()-1);
     if(exe == filename.right(filename.size()-1)) {
         out.setPermissions(QFile::ExeOwner | QFile::ReadOwner | QFile::WriteOwner);
     }
@@ -203,6 +205,7 @@ void Updater::down() {
             logger->log() << netReply->errorString() << endl;
             exit(17);
         } else {
+            qDebug() << "Saved: " << out.fileName();
             currentAction->setText("Complete");
             currentUrlIdx++;
             if(currentUrlIdx < updates.size()) {
