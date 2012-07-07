@@ -32,6 +32,7 @@ protected slots:
     void setProgress(qint64, qint64);
     void down();
     void run();
+    void processError(QProcess::ProcessError);
 
 private:
     // network

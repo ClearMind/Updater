@@ -3,7 +3,7 @@
 #include <QTime>
 #include <QMap>
 
-#define PLATFORM "linux"
+#define PLATFORM "win32"
 
 Updater::Updater(const QString &pn, const QString &p, const QString &u, QWidget *parent):
         QWidget(parent),
@@ -40,18 +40,18 @@ Updater::Updater(const QString &pn, const QString &p, const QString &u, QWidget 
     setWindowIcon(QIcon(":/icon.png"));
 
     // create directories ++++++++++++++++++++++++++++++++++++++++++++++++++
-    QDir dir(QDir::homePath() + "/.updater/" + programName);
+    QDir dir(QDir::toNativeSeparators(QDir::homePath() + "/.updater/" + programName));
     if(!dir.exists()) {
         // logging
         logger->log() << "Created standard directories: "
                 << QDir::homePath() + "/.updater; "
                 << QDir::homePath() + "/.updater/" + programName << endl;
         // mkdir
-        dir.mkdir(QDir::homePath() + "/.updater");
-        dir.mkdir(QDir::homePath() + "/.updater/" + programName);
+        dir.mkpath(QDir::toNativeSeparators(QDir::homePath() + "/.updater/" + programName));
     }
     connect(this, SIGNAL(updateFinished()), this, SLOT(run()));
     connect(proc, SIGNAL(finished(int)), this, SLOT(close()));
+    connect(proc, SIGNAL(started()), this, SLOT(hide()));
 }
 
 void Updater::checkForUpdates() {
@@ -59,16 +59,22 @@ void Updater::checkForUpdates() {
     if(!netReplyXml) {
         logger->log() << QString("Error! -- ") + netReplyXml->errorString() << endl;
         emit updateFinished(); // run without update
-//        exit(1);
     }
 
     // connection singnals and slots
     connect(netReplyXml, SIGNAL(readyRead()), this, SLOT(getXml()));
     connect(netReplyXml, SIGNAL(downloadProgress(qint64, qint64)), this, SLOT(setProgress(qint64, qint64)));
+    connect(proc, SIGNAL(error(QProcess::ProcessError)), this, SLOT(processError(QProcess::ProcessError)));
+}
+
+void Updater::processError(QProcess::ProcessError e) {
+    QMessageBox mbox;
+    mbox.setText(QString("Error: %1").arg(e));
+    proc->terminate();
 }
 
 void Updater::getXml() {
-    QFile fout(QDir::homePath() + "/.updater/" + programName + "/update.xml");
+    QFile fout(QDir::toNativeSeparators(QDir::homePath() + "/.updater/" + programName + "/update.xml"));
     if(!fout.open(QIODevice::WriteOnly | QIODevice::Text)) {
         // error messages to log
         logger->log() << fout.errorString() << endl;
@@ -92,7 +98,7 @@ void Updater::getXml() {
 }
 
 void Updater::parseXml() {
-    QFile current(QDir::homePath() + "/.updater/" + programName + "/current.xml");
+    QFile current(QDir::toNativeSeparators(QDir::homePath() + "/.updater/" + programName + "/current.xml"));
     if(current.exists()) {
         if(!current.open(QIODevice::ReadOnly | QIODevice::Text)) {
             logger->log() << current.errorString() << endl;
@@ -100,7 +106,7 @@ void Updater::parseXml() {
 //            exit(3);
         }
     }
-    QFile update(QDir::homePath() + "/.updater/" + programName + "/update.xml");
+    QFile update(QDir::toNativeSeparators(QDir::homePath() + "/.updater/" + programName + "/update.xml"));
     if(!update.open(QIODevice::ReadOnly | QIODevice::Text)) {
         logger->log() << update.errorString() << endl;
         emit updateFinished(); // run program without update
@@ -221,11 +227,24 @@ void Updater::down() {
                 connect(netReply, SIGNAL(downloadProgress(qint64, qint64)), this, SLOT(setProgress(qint64, qint64)));
             } else {
                 QProcess rmcp;
+#ifdef Q_OS_LINUX
                 rmcp.start("rm " + QDir::homePath() + "/.updater/" + programName + "/current.xml");
                 rmcp.waitForFinished();
                 rmcp.start("cp " + QDir::homePath() + "/.updater/" + programName + "/update.xml " +
                            QDir::homePath() + "/.updater/" + programName + "/current.xml");
                 rmcp.waitForFinished();
+#endif
+#ifdef Q_OS_WIN32
+                QString del_command = "cmd /C del \"" + QDir::toNativeSeparators(QDir::homePath() + "/.updater/" + programName + "/current.xml\"");
+                rmcp.start(del_command);
+                rmcp.waitForFinished();
+                qDebug() << del_command;
+                QString copy_command = "cmd /C copy \"" + QDir::toNativeSeparators(QDir::homePath() + "/.updater/" + programName + "/update.xml\" \"") +
+                        QDir::toNativeSeparators(QDir::homePath() + "/.updater/" + programName + "/current.xml\"");
+                rmcp.start(copy_command);
+                rmcp.waitForFinished();
+                qDebug() << copy_command;
+#endif
                 emit updateFinished();
             }
         }
@@ -236,9 +255,11 @@ void Updater::down() {
 void Updater::run() {
     if(!exe.isEmpty()) {
         logger->log() << "Running program: " << exe << endl;
-
-        proc->start(path + "/" + exe);
-        this->hide();
+        QString exe_command = "\"" + QDir::toNativeSeparators(path + exe) + "\"";
+        currentAction->setText(tr("Running ") + exe + "...");
+        proc->start(exe_command);
+        qDebug() << exe_command;
+//        this->hide();
     } else {
         this->close();
     }

@@ -21,7 +21,10 @@ int main(int argc, char *argv[]) {
     }
 
     // Log file preparation
-    QFile *logFile = new QFile(QDir::homePath() + "/.updater/updater.log");
+    QDir dir;
+    dir.setPath(QDir::toNativeSeparators(QDir::homePath() + "/.updater"));
+    dir.mkpath(dir.path());
+    QFile *logFile = new QFile(QDir::toNativeSeparators(QDir::homePath() + "/.updater/updater.log"));
     logFile->open(QIODevice::Append | QIODevice::Text);
     SLogger *logger = SLogger::instance();
     logger->setDevice(logFile);
